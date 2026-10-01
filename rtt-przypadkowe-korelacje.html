@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RTT — przypadkowe korelacje</title>
+  <style>
+    :root{
+      --bg:#f3f1ec;
+      --panel:#fbfaf7;
+      --ink:#171918;
+      --muted:#6f746f;
+      --line:#d8d6cf;
+      --line-strong:#bdbab1;
+      --accent:#244c54;
+      --accent-soft:#dbe6e5;
+      --shadow:0 16px 40px rgba(20,24,22,.07);
+    }
+
+    *{box-sizing:border-box}
+
+    html,body{
+      margin:0;
+      min-height:100%;
+      background:var(--bg);
+      color:var(--ink);
+      font-family:Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-variant-numeric:tabular-nums;
+    }
+
+    body{
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .shell{
+      width:min(1500px, calc(100% - 48px));
+      margin:0 auto;
+      padding:34px 0 26px;
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      gap:22px;
+    }
+
+    header{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:32px;
+      border-bottom:1px solid var(--line-strong);
+      padding-bottom:18px;
+    }
+
+    .eyebrow{
+      text-transform:uppercase;
+      letter-spacing:.16em;
+      font-size:11px;
+      color:var(--accent);
+      font-weight:700;
+      margin-bottom:7px;
+    }
+
+    h1{
+      margin:0;
+      font-family:Georgia, "Times New Roman", serif;
+      font-size:clamp(27px, 3vw, 44px);
+      font-weight:500;
+      line-height:1;
+      letter-spacing:-.03em;
+    }
+
+    .header-note{
+      max-width:480px;
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+      text-align:right;
+    }
+
+    main{
+      display:grid;
+      grid-template-columns:minmax(650px, 1.15fr) minmax(500px, .85fr);
+      gap:22px;
+      align-items:start;
+    }
+
+    .panel{
+      background:var(--panel);
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+      border-radius:3px;
+      overflow:hidden;
+    }
+
+    .panel-head{
+      min-height:76px;
+      padding:18px 20px 16px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-end;
+      gap:20px;
+      border-bottom:1px solid var(--line);
+    }
+
+    .panel-title{
+      margin:0;
+      font-size:15px;
+      font-weight:700;
+      letter-spacing:.01em;
+    }
+
+    .panel-sub{
+      margin:4px 0 0;
+      color:var(--muted);
+      font-size:11.5px;
+      line-height:1.35;
+    }
+
+    .count{
+      text-align:right;
+      white-space:nowrap;
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .count strong{
+      display:block;
+      color:var(--ink);
+      font-size:21px;
+      font-weight:600;
+      line-height:1.05;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      max-height:760px;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    .data-table{
+      font-size:11.5px;
+    }
+
+    th,td{
+      border-right:1px solid var(--line);
+      border-bottom:1px solid var(--line);
+      text-align:center;
+    }
+
+    th:last-child, td:last-child{border-right:0}
+
+    .data-table thead th{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:#f0efea;
+      height:34px;
+      padding:5px 8px;
+      font-size:10px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      font-weight:700;
+      color:#4f5551;
+    }
+
+    .data-table tbody td{
+      height:22px;
+      padding:2px 8px;
+    }
+
+    .data-table tbody tr:nth-child(even) td{
+      background:rgba(30,45,40,.018);
+    }
+
+    .data-table .idcol{
+      width:42px;
+      color:#8a8d89;
+      background:#f6f5f1;
+      font-size:10.5px;
+    }
+
+    .matrix-area{
+      padding:18px 20px 0;
+    }
+
+    .matrix{
+      table-layout:fixed;
+      font-size:12px;
+    }
+
+    .matrix th{
+      background:#f0efea;
+      height:43px;
+      padding:5px 4px;
+      font-size:10px;
+      letter-spacing:.06em;
+      color:#4f5551;
+      font-weight:700;
+    }
+
+    .matrix .rowhead{
+      width:54px;
+      text-align:left;
+      padding-left:10px;
+    }
+
+    .matrix td{
+      height:54px;
+      padding:4px;
+      font-weight:550;
+      position:relative;
+    }
+
+    .matrix td.upper{
+      background:#f7f6f2;
+      color:transparent;
+    }
+
+    .matrix td.diagonal{
+      background:#eeede8;
+      color:#aaa9a3;
+      font-weight:400;
+    }
+
+    .matrix td.sig{
+      background:var(--accent-soft);
+      color:#173e44;
+      font-weight:750;
+    }
+
+    .stars{
+      font-size:.75em;
+      vertical-align:.36em;
+      letter-spacing:.02em;
+      margin-left:1px;
+    }
+
+    .legend{
+      padding:16px 20px 19px;
+      color:var(--muted);
+      font-size:11.5px;
+      line-height:1.55;
+      display:flex;
+      justify-content:space-between;
+      gap:18px;
+      border-top:1px solid var(--line);
+      margin-top:18px;
+    }
+
+    .legend strong{
+      color:var(--ink);
+      font-weight:650;
+    }
+
+    .abbr{
+      padding:14px 20px 15px;
+      border-top:1px solid var(--line);
+      color:var(--muted);
+      font-size:10.5px;
+      line-height:1.55;
+    }
+
+    .abbr b{color:#4c514e}
+
+    footer{
+      display:flex;
+      justify-content:center;
+      padding-top:2px;
+    }
+
+    button{
+      border:1px solid var(--accent);
+      background:var(--accent);
+      color:#fff;
+      padding:13px 24px;
+      border-radius:2px;
+      font:inherit;
+      font-size:13px;
+      font-weight:650;
+      letter-spacing:.01em;
+      cursor:pointer;
+      box-shadow:0 8px 18px rgba(36,76,84,.14);
+      transition:transform .12s ease, box-shadow .12s ease, background .12s ease;
+    }
+
+    button:hover{
+      background:#1d4148;
+      box-shadow:0 10px 22px rgba(36,76,84,.2);
+      transform:translateY(-1px);
+    }
+
+    button:active{transform:translateY(0)}
+
+    @media (max-width:1120px){
+      main{grid-template-columns:1fr}
+      .table-wrap{max-height:630px}
+      .header-note{max-width:420px}
+    }
+
+    @media (max-width:720px){
+      .shell{width:min(100% - 24px, 1500px); padding-top:20px}
+      header{align-items:flex-start; flex-direction:column; gap:12px}
+      .header-note{text-align:left}
+      .panel-head{align-items:flex-start; flex-direction:column}
+      .count{text-align:left}
+      .matrix-area{padding:12px 10px 0}
+      .matrix td{height:44px;font-size:10.5px}
+      .matrix th{font-size:9px}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">Demonstracja dydaktyczna</div>
+        <h1>Przypadkowe korelacje</h1>
+      </div>
+      <div class="header-note">
+        30 obserwacji × 7 cech RTT. Każda wartość jest losowana niezależnie
+        z zakresu 20–40. W danych nie zaprogramowano żadnego związku między zmiennymi.
+      </div>
+    </header>
+
+    <main>
+      <section class="panel" aria-labelledby="data-title">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title" id="data-title">Losowy zbiór danych RTT</h2>
+            <p class="panel-sub">Wartości całkowite 20–40 · N = 30</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table" id="dataTable"></table>
+        </div>
+        <div class="abbr">
+          <b>ŻW</b> żwawość · <b>PE</b> perseweratywność · <b>RY</b> rytmiczność ·
+          <b>WS</b> wrażliwość sensoryczna · <b>WT</b> wytrzymałość ·
+          <b>RE</b> reaktywność emocjonalna · <b>AK</b> aktywność
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="corr-title">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title" id="corr-title">Macierz korelacji Pearsona</h2>
+            <p class="panel-sub">Wyłącznie dolny trójkąt · testy dwustronne</p>
+          </div>
+          <div class="count" aria-live="polite">
+            <strong id="sigCount">0 / 21</strong>
+            korelacji p &lt; .05
+          </div>
+        </div>
+
+        <div class="matrix-area">
+          <table class="matrix" id="corrTable"></table>
+        </div>
+
+        <div class="legend">
+          <div>
+            <strong>Oznaczenia:</strong>
+            * p &lt; .05 &nbsp;&nbsp; ** p &lt; .01 &nbsp;&nbsp; *** p &lt; .001
+          </div>
+          <div>r Pearsona</div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <button id="regenerate" type="button">Pokaż nowy zbiór danych</button>
+    </footer>
+  </div>
+
+<script>
+(() => {
+  const vars = [
+    {abbr:"ŻW", name:"Żwawość"},
+    {abbr:"PE", name:"Perseweratywność"},
+    {abbr:"RY", name:"Rytmiczność"},
+    {abbr:"WS", name:"Wrażliwość sensoryczna"},
+    {abbr:"WT", name:"Wytrzymałość"},
+    {abbr:"RE", name:"Reaktywność emocjonalna"},
+    {abbr:"AK", name:"Aktywność"}
+  ];
+
+  const N = 30;
+
+  // Uniform integer from min to max inclusive, using Web Crypto.
+  function randInt(min, max){
+    const range = max - min + 1;
+    const maxUint = 0xFFFFFFFF;
+    const limit = maxUint - (maxUint % range);
+    const a = new Uint32Array(1);
+    let x;
+    do {
+      crypto.getRandomValues(a);
+      x = a[0];
+    } while (x >= limit);
+    return min + (x % range);
+  }
+
+  function generateData(){
+    return Array.from({length:N}, () =>
+      vars.map(() => randInt(20, 40))
+    );
+  }
+
+  function pearson(x, y){
+    const n = x.length;
+    let sx=0, sy=0;
+    for(let i=0;i<n;i++){ sx += x[i]; sy += y[i]; }
+    const mx=sx/n, my=sy/n;
+
+    let num=0, dx2=0, dy2=0;
+    for(let i=0;i<n;i++){
+      const dx=x[i]-mx, dy=y[i]-my;
+      num += dx*dy;
+      dx2 += dx*dx;
+      dy2 += dy*dy;
+    }
+    return num / Math.sqrt(dx2*dy2);
+  }
+
+  // Numerical Recipes style routines for the regularized incomplete beta.
+  function logGamma(z){
+    const p = [
+      0.99999999999980993,
+      676.5203681218851,
+      -1259.1392167224028,
+      771.32342877765313,
+      -176.61502916214059,
+      12.507343278686905,
+      -0.13857109526572012,
+      9.9843695780195716e-6,
+      1.5056327351493116e-7
+    ];
+    if(z < 0.5){
+      return Math.log(Math.PI) - Math.log(Math.sin(Math.PI*z)) - logGamma(1-z);
+    }
+    z -= 1;
+    let x = p[0];
+    for(let i=1;i<p.length;i++) x += p[i]/(z+i);
+    const t = z + 7.5;
+    return 0.5*Math.log(2*Math.PI) + (z+0.5)*Math.log(t) - t + Math.log(x);
+  }
+
+  function betaCF(a,b,x){
+    const MAXIT=200;
+    const EPS=3e-14;
+    const FPMIN=1e-300;
+
+    const qab=a+b, qap=a+1, qam=a-1;
+    let c=1;
+    let d=1 - qab*x/qap;
+    if(Math.abs(d)<FPMIN) d=FPMIN;
+    d=1/d;
+    let h=d;
+
+    for(let m=1;m<=MAXIT;m++){
+      const m2=2*m;
+      let aa=m*(b-m)*x/((qam+m2)*(a+m2));
+      d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN;
+      c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+      d=1/d;
+      h*=d*c;
+
+      aa=-(a+m)*(qab+m)*x/((a+m2)*(qap+m2));
+      d=1+aa*d; if(Math.abs(d)<FPMIN)d=FPMIN;
+      c=1+aa/c; if(Math.abs(c)<FPMIN)c=FPMIN;
+      d=1/d;
+      const del=d*c;
+      h*=del;
+      if(Math.abs(del-1)<EPS) break;
+    }
+    return h;
+  }
+
+  function regIncompleteBeta(x,a,b){
+    if(x<=0) return 0;
+    if(x>=1) return 1;
+    const bt = Math.exp(
+      logGamma(a+b)-logGamma(a)-logGamma(b) +
+      a*Math.log(x) + b*Math.log(1-x)
+    );
+    if(x < (a+1)/(a+b+2)){
+      return bt*betaCF(a,b,x)/a;
+    }
+    return 1 - bt*betaCF(b,a,1-x)/b;
+  }
+
+  function pValueForR(r,n){
+    const df=n-2;
+    const rr=Math.min(Math.abs(r), 0.999999999999);
+    const t=rr*Math.sqrt(df/(1-rr*rr));
+    const x=df/(df+t*t);
+    return regIncompleteBeta(x, df/2, 0.5); // two-tailed p
+  }
+
+  function stars(p){
+    if(p < .001) return "***";
+    if(p < .01) return "**";
+    if(p < .05) return "*";
+    return "";
+  }
+
+  function formatR(r){
+    let s = Math.abs(r).toFixed(2).replace(/^0/,"");
+    return (r < 0 ? "−" : "") + s;
+  }
+
+  function renderData(data){
+    const t=document.getElementById("dataTable");
+    let html="<thead><tr><th class='idcol'>#</th>";
+    for(const v of vars){
+      html += `<th title="${v.name}">${v.abbr}</th>`;
+    }
+    html += "</tr></thead><tbody>";
+
+    data.forEach((row,i)=>{
+      html += `<tr><td class="idcol">${String(i+1).padStart(2,"0")}</td>`;
+      row.forEach(v => html += `<td>${v}</td>`);
+      html += "</tr>";
+    });
+    html += "</tbody>";
+    t.innerHTML=html;
+  }
+
+  function renderCorrelations(data){
+    const cols = vars.map((_,j)=>data.map(row=>row[j]));
+    const t=document.getElementById("corrTable");
+    let sig=0;
+
+    let html="<thead><tr><th class='rowhead'></th>";
+    vars.forEach(v => html += `<th title="${v.name}">${v.abbr}</th>`);
+    html += "</tr></thead><tbody>";
+
+    for(let i=0;i<vars.length;i++){
+      html += `<tr><th class="rowhead" title="${vars[i].name}">${vars[i].abbr}</th>`;
+      for(let j=0;j<vars.length;j++){
+        if(j>i){
+          html += `<td class="upper">&nbsp;</td>`;
+        } else if(j===i){
+          html += `<td class="diagonal">—</td>`;
+        } else {
+          const r=pearson(cols[i], cols[j]);
+          const p=pValueForR(r,N);
+          const st=stars(p);
+          if(p<.05) sig++;
+          const cls=st ? "sig" : "";
+          const pText = p < .001 ? "&lt; .001" : "= " + p.toFixed(3).replace(/^0/,"");
+          html += `<td class="${cls}" title="r = ${r.toFixed(3)}; p ${pText}">
+            ${formatR(r)}<span class="stars">${st}</span>
+          </td>`;
+        }
+      }
+      html += "</tr>";
+    }
+    html += "</tbody>";
+    t.innerHTML=html;
+    document.getElementById("sigCount").textContent = `${sig} / 21`;
+  }
+
+  function regenerate(){
+    const data=generateData();
+    renderData(data);
+    renderCorrelations(data);
+  }
+
+  document.getElementById("regenerate").addEventListener("click", regenerate);
+  regenerate();
+})();
+</script>
+</body>
+</html>
